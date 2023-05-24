@@ -35,7 +35,8 @@ module.exports = (app) => {
 
   // CREATE PET
   app.post('/pets', (req, res) => {
-    var pet = new Pet(req.body);
+    console.log(req.body);
+    var pet = new Pet({ ...req.body, birthday: new Date() });
 
     pet
       .save()
@@ -44,6 +45,7 @@ module.exports = (app) => {
       })
       .catch((err) => {
         // Handle Errors
+        res.status(400).send({ err: err });
       });
   });
 
