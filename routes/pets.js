@@ -10,7 +10,6 @@ const client = new Upload(process.env.S3_BUCKET, {
   aws: {
     path: 'pets/avatar',
     region: process.env.S3_REGION,
-    acl: 'public-read',
     accessKeyId: process.env.AWS_ACCESS_KEY_ID,
     secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
   },
@@ -66,26 +65,23 @@ module.exports = (app) => {
 
   // CREATE PET
   app.post('/pets', upload.single('avatar'), (req, res, next) => {
-    console.log(req.file);
-
     let pet = new Pet({ ...req.body, birthday: new Date() });
     pet.save((err) => {
       if (req.file) {
         // upload the images
-        client.upload(req.file.path, {}, function (err, versions, meta) {
+        client.upload(req.file.path, {}, async function (err, versions, meta) {
           if (err) {
             return res.status(400).send({ err: err });
           }
 
-          versions.forEach((image) => {
-            const urlArray = image.url.split('-');
-            urlArray.pop();
-            const url = urlArray.join('-');
-            pet.avatarUrl = url;
-            pet.save();
-          });
+          const urlArray = versions[0].url.split('-');
+          urlArray.pop();
+          const url = urlArray.join('-');
+          pet.avatarUrl = url;
+          console.log(url);
+          pet.save();
 
-          return res.redirect(`/pets/${pet._id}`);
+          return res.json({ pet: pet });
         });
       } else {
         return res.redirect(`/pets/${pet._id}`);
@@ -122,6 +118,36 @@ module.exports = (app) => {
   app.delete('/pets/:id', (req, res) => {
     Pet.findByIdAndRemove(req.params.id).exec((err, pet) => {
       return res.redirect('/');
+    });
+  });
+  // Purchase
+  app.post('/pets/:id/purchase', (req, res) => {
+    var stripe = require('stripe')(process.env.PRIVATE_STRIPE_API_KEY);
+
+    const token = req.body.stripeToken; // Using Express
+
+    const petId = req.params.id || req.body.petId;
+
+    Pet.findById(petId).exec((err, pet) => {
+      if (err) {
+        console.log('Error: ' + err);
+        res.redirect(`/pets/${req.params.id}`);
+      }
+
+      const charge = stripe.charges
+        .create({
+          amount: pet.price * 100,
+          currency: 'usd',
+          description: `Purchased ${pet.name}, ${pet.species}`,
+          source: token,
+        })
+        .then((charge) => {
+          res.redirect(`/pets/${req.params.id}`);
+        })
+        .catch((err) => {
+          console.log('Error: ' + err);
+          res.redirect(`/pets/${req.params.id}`);
+        });
     });
   });
 };
