@@ -1,6 +1,37 @@
 // MODELS
 const Pet = require('../models/pet');
 
+// Uploading to aws s3
+const multer = require('multer');
+const upload = multer({ dest: 'uploads/' });
+const Upload = require('s3-uploader');
+
+const client = new Upload(process.env.S3_BUCKET, {
+  aws: {
+    path: 'pets/avatar',
+    region: process.env.S3_REGION,
+    acl: 'public-read',
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+  },
+  cleanup: {
+    versions: true,
+    original: true,
+  },
+  versions: [
+    {
+      maxWidth: 400,
+      aspect: '16:10',
+      suffix: '-standard',
+    },
+    {
+      maxWidth: 300,
+      aspect: '1:1',
+      suffix: '-square',
+    },
+  ],
+});
+
 // PET ROUTES
 module.exports = (app) => {
   // INDEX PET => index.js
@@ -34,19 +65,32 @@ module.exports = (app) => {
   });
 
   // CREATE PET
-  app.post('/pets', (req, res) => {
-    console.log(req.body);
-    var pet = new Pet({ ...req.body, birthday: new Date() });
+  app.post('/pets', upload.single('avatar'), (req, res, next) => {
+    console.log(req.file);
 
-    pet
-      .save()
-      .then((pet) => {
-        res.redirect(`/pets/${pet._id}`);
-      })
-      .catch((err) => {
-        // Handle Errors
-        res.status(400).send({ err: err });
-      });
+    let pet = new Pet({ ...req.body, birthday: new Date() });
+    pet.save((err) => {
+      if (req.file) {
+        // upload the images
+        client.upload(req.file.path, {}, function (err, versions, meta) {
+          if (err) {
+            return res.status(400).send({ err: err });
+          }
+
+          versions.forEach((image) => {
+            const urlArray = image.url.split('-');
+            urlArray.pop();
+            const url = urlArray.join('-');
+            pet.avatarUrl = url;
+            pet.save();
+          });
+
+          return res.redirect(`/pets/${pet._id}`);
+        });
+      } else {
+        return res.redirect(`/pets/${pet._id}`);
+      }
+    });
   });
 
   // SHOW PET

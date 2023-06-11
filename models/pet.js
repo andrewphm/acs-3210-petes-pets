@@ -13,12 +13,13 @@ const mongoose = require('mongoose'),
 const PetSchema = new Schema(
   {
     name: { type: String, required: true },
+    birthday: { type: String, required: true },
     species: { type: String, required: true },
-    birthday: { type: Date, required: true },
-    picUrl: { type: String, required: true },
-    picUrlSq: { type: String, required: true },
+    picUrl: { type: String },
+    picUrlSq: { type: String },
+    avatarUrl: { type: String, required: true },
     favoriteFood: { type: String, required: true },
-    description: { type: String, required: true, minlength: 140 },
+    description: { type: String, minlength: 140, required: true },
   },
   {
     timestamps: true,
