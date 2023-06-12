@@ -1,6 +1,8 @@
 // MODELS
 const Pet = require('../models/pet');
 
+const mailer = require('../utils/mailer');
+
 // Uploading to aws s3
 const multer = require('multer');
 const upload = multer({ dest: 'uploads/' });
@@ -142,6 +144,14 @@ module.exports = (app) => {
           source: token,
         })
         .then((charge) => {
+          const user = {
+            email: req.body.stripeEmail,
+            amount: charge.amount / 100,
+            petName: pet.name,
+          };
+
+          mailer.sendMail(user, req, res);
+
           res.redirect(`/pets/${req.params.id}`);
         })
         .catch((err) => {
