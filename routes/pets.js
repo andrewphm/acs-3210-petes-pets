@@ -37,27 +37,41 @@ const client = new Upload(process.env.S3_BUCKET, {
 module.exports = (app) => {
   // INDEX PET => index.js
   app.get('/search', (req, res) => {
-    const term = new RegExp(req.query.term, 'i');
+    // const term = new RegExp(req.query.term, 'i');
 
-    const page = req.query.page || 1;
-    Pet.paginate(
-      {
-        $or: [
-          { name: term },
-          {
-            species: term,
-          },
-        ],
-      },
-      { page: page }
-    ).then((results) => {
-      res.render('pets-index', {
-        pets: results.docs,
-        pageCount: results.pages,
-        currentPage: page,
-        term: req.query.term,
+    // const page = req.query.page || 1;
+    // Pet.paginate(
+    //   {
+    //     $or: [
+    //       { name: term },
+    //       {
+    //         species: term,
+    //       },
+    //     ],
+    //   },
+    //   { page: page }
+    // ).then((results) => {
+    //   res.render('pets-index', {
+    //     pets: results.docs,
+    //     pageCount: results.pages,
+    //     currentPage: page,
+    //     term: req.query.term,
+    //   });
+    // });
+
+    Pet.find({ $text: { $search: req.query.term } })
+      .sort({ score: { $meta: 'textScore' } })
+      .limit(20)
+      .exec((err, pets) => {
+        if (err) {
+          return res.status(400).send(err);
+        }
+        if (req.header('Content-Type') == 'application/json') {
+          return res.json({ pets: pets });
+        } else {
+          return res.render('pets-index', { pets: pets, term: req.query.term });
+        }
       });
-    });
   });
 
   // NEW PET
